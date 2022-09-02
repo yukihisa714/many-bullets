@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="jp">
+
+<head>
+    <meta charset="UTF-8">
+</head>
+
+<body>
+    <script>
+
+        let frame = 0;
+
+        const BLOCK_SIZE = 20;
+        const BLOCK_LINE_WIDTH = BLOCK_SIZE / 16;
+        const FIELD_ROW = 20;
+        const FIELD_COL = 15;
+        const FIELD_WIDTH = FIELD_COL * BLOCK_SIZE;
+        const FIELD_HEIGHT = FIELD_ROW * BLOCK_SIZE;
+
+        let ballRadius = BLOCK_SIZE / 4;
+        let ballSpeed = BLOCK_SIZE / 4;
+        let stackBallsMax = 100;
+        let stackBalls = stackBallsMax;
+        const launchAngleMax = 80;
+        const launchAngleMin = -80;
+        let launchAngle = 0;
+
+        const can = document.createElement("canvas");
+        const con = can.getContext("2d");
+        can.width = FIELD_WIDTH;
+        can.height = FIELD_HEIGHT;
+        can.style.background = "black";
+        document.body.appendChild(can);
+
+
+
+        let blocks = [
+            [10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10],
+            [10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10],
+            [10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10],
+            [10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10],
+            [10, 50, 0, 0, 0, 10, 50, 0, 0, 0, 100, 0, 10, 10, 10],
+            [10, 50, 0, 0, 0, 10, 50, 0, 0, 0, 100, 0, 10, 10, 10],
+            [10, 50, 0, 0, 0, 10, 50, 0, 0, 0, 100, 0, 10, 10, 10],
+            [10, 50, 0, 0, 0, 10, 50, 0, 0, 0, 100, 0, 10, 10, 10],
+            [10, 50, 0, 0, 0, 10, 50, 0, 0, 0, 100, 0, 10, 10, 10],
+            [10, 0, 50, 0, 0, 0, 0, 50, 0, 0, 0, 0, 0, 0, 10],
+            [10, 0, 0, 0, 0, 0, 0, 0, 0, 50, 0, 0, 0, 0, 10],
+            [10, 0, 0, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10],
+            [10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10],
+            [10, 0, 50, 0, 0, 0, 0, 50, 0, 0, 0, 0, 0, 0, 10],
+            [10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        ];
+
+
+        class Ball {
+            constructor(x, y, angle, number) {
+                this.x = x;
+                this.y = y;
+                this.radius = ballRadius;
+                this.speed = ballSpeed;
+                this.angle = angle - 90;
+                this.moveX = Math.cos(Math.PI / 180 * this.angle) * this.speed;
+                this.moveY = Math.sin(Math.PI / 180 * this.angle) * this.speed;
+                this.life = true;
+                this.number = number;
+            }
+            update() {
+                this.x += this.moveX;
+                this.y += this.moveY;
+
+                this.judgeCoords = {
+                    upper: {
+                        x: this.x,
+                        y: this.y - this.radius,
+                    },
+                    under: {
+                        x: this.x,
+                        y: this.y + this.radius,
+                    },
+                    left: {
+                        x: this.x - this.radius,
+                        y: this.y,
+                    },
+                    right: {
+                        x: this.x + this.radius,
+                        y: this.y,
+                    },
+                }
+
+                if (this.judgeCoords.upper.y + this.moveY <= 0) this.moveY *= -1;
+                if (this.judgeCoords.under.y >= FIELD_HEIGHT) this.life = false;
+                if (this.judgeCoords.left.x <= 0) this.moveX *= -1;
+                if (this.judgeCoords.right.x >= FIELD_WIDTH) this.moveX *= -1;
+
+                if (!this.life) {
+                    BALLS.splice(this.number, 1);
+                    for (let i = this.number; i < BALLS.length; i++) {
+                        BALLS[i].number--;
+                    }
+                    return;
+                }
+
+                this.judgeBlocksCoord = {
+                    upper: {
+                        x: calcCoordToBlock(this.judgeCoords.upper.x),
+                        y: calcCoordToBlock(this.judgeCoords.upper.y),
+                    },
+                    under: {
+                        x: calcCoordToBlock(this.judgeCoords.under.x),
+                        y: calcCoordToBlock(this.judgeCoords.under.y),
+                    },
+                    left: {
+                        x: calcCoordToBlock(this.judgeCoords.left.x),
+                        y: calcCoordToBlock(this.judgeCoords.left.y),
+                    },
+                    right: {
+                        x: calcCoordToBlock(this.judgeCoords.right.x),
+                        y: calcCoordToBlock(this.judgeCoords.right.y),
+                    },
+                }
+
+                this.judgeBlocks = {
+                    upper: blocks[
+                        this.judgeBlocksCoord.upper.y
+                    ][
+                        this.judgeBlocksCoord.upper.x
+                    ],
+                    under: blocks[
+                        this.judgeBlocksCoord.under.y
+                    ][
+                        this.judgeBlocksCoord.under.x
+                    ],
+                    left: blocks[
+                        this.judgeBlocksCoord.left.y
+                    ][
+                        this.judgeBlocksCoord.left.x
+                    ],
+                    right: blocks[
+                        this.judgeBlocksCoord.right.y
+                    ][
+                        this.judgeBlocksCoord.right.x
+                    ],
+                };
+
+                if (this.judgeBlocks.upper) {
+                    this.moveY *= -1;
+                    blocks[this.judgeBlocksCoord.upper.y][this.judgeBlocksCoord.upper.x]--;
+                }
+                if (this.judgeBlocks.under) {
+                    this.moveY *= -1;
+                    blocks[this.judgeBlocksCoord.under.y][this.judgeBlocksCoord.under.x]--;
+                }
+                if (this.judgeBlocks.left) {
+                    this.moveX *= -1;
+                    blocks[this.judgeBlocksCoord.left.y][this.judgeBlocksCoord.left.x]--;
+                }
+                if (this.judgeBlocks.right) {
+                    this.moveX *= -1;
+                    blocks[this.judgeBlocksCoord.right.y][this.judgeBlocksCoord.right.x]--;
+                }
+            }
+
+            draw() {
+                con.fillStyle = "red";
+                con.beginPath();
+                con.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false);
+                con.fill();
+            }
+        }
+
+        const BALLS = [];
+
+
+        class BallLaunchControl {
+            constructor() {
+                this.stackBalls = stackBallsMax;
+            }
+        }
+
+
+        function calcCoordToBlock(coord) {
+            return Math.floor(coord / BLOCK_SIZE);
+        }
+
+        function drawOneBlock(x, y, color) {
+            con.fillStyle = color;
+            con.fillRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+            con.strokeStyle = "gray";
+            con.lineWidth = BLOCK_LINE_WIDTH;
+            con.strokeRect(x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+        }
+
+        function drawBlocks() {
+            for (let row = 0; row < FIELD_ROW; row++) {
+                for (let col = 0; col < FIELD_COL; col++) {
+                    const p = blocks[row][col];
+                    if (!p) continue;
+                    drawOneBlock(col, row, "green");
+                    con.fillStyle = "black";
+                    con.fillText(p, col * BLOCK_SIZE, (row + 1) * BLOCK_SIZE);
+                }
+            }
+        }
+
+        let mouseX = 0;
+        let mouseY = 0;
+        can.addEventListener("mousemove", function (e) {
+            const rect = can.getBoundingClientRect();
+            mouseX = e.clientX - rect.left;
+            mouseY = e.clientY - rect.top;
+        });
+
+        let keys = [];
+        document.onkeydown = function (e) {
+            keys[e.keyCode] = true;
+            if (e.keyCode === 32) {
+                if (!BALLS.length) {
+                    stackBalls = stackBallsMax;
+                }
+            }
+            document.onkeyup = function (e) {
+                keys[e.keyCode] = false;
+            }
+        }
+
+        function mainLoop() {
+            con.clearRect(0, 0, FIELD_WIDTH, FIELD_HEIGHT);
+            frame++;
+            if (frame % 4 === 0) {
+                if (stackBalls) {
+                    stackBalls--;
+                    BALLS[stackBalls] = new Ball(can.width / 2, can.height * 0.9, launchAngle, stackBalls);
+                }
+            }
+
+            for (let row = 0; row < FIELD_ROW; row++) {
+                for (let col = 0; col < FIELD_COL; col++) {
+                    if (blocks[row][col] < 0) {
+                        blocks[row][col] = 0;
+                    }
+                }
+            }
+            drawBlocks()
+
+            for (const ball of BALLS) {
+                if (!ball) continue;
+                ball.update();
+                ball.draw();
+            }
+
+            if (!BALLS.length) {
+                if (keys[37] && launchAngleMin < launchAngle) launchAngle -= 2;
+                if (keys[39] && launchAngle < launchAngleMax) launchAngle += 2;
+            }
+
+            con.fillStyle = "white";
+            con.fillText("ボールの数:" + BALLS.length, 0, can.height * 0.91);
+            con.fillText("x:" + mouseX + " y:" + mouseY, 0, can.height * 0.95);
+            con.fillText("発射角度:" + launchAngle, 0, can.height * 0.99);
+
+        };
+
+        setInterval(mainLoop, 1000 / 60);
+
+    </script>
+</body>
+
+</html>
